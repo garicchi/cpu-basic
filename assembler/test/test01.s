@@ -1,0 +1,2 @@
+mov 0x4
+add r1, r0
