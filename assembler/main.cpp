@@ -38,42 +38,52 @@ uint16_t assemble_opcode(Token opcode_token) {
     return instructions[opcode_token.str];
 }
 
-uint16_t assemble_operand(Token operand_token) {
+uint16_t assemble_operand(Token operand_token, shared_ptr<map<string, int>> label_table) {
     if (operand_token.type == TokenType::HEX) {
         return stoi(operand_token.str, 0, 16);
     }
-    if (registers.find(operand_token.str) == registers.end()) {
-        cerr << "invalid operand " << operand_token.str << endl;
-        exit(1);
+    if (label_table->find(operand_token.str) != label_table->end()) {
+        return label_table->at(operand_token.str);
     }
-    return registers[operand_token.str];
+    if (registers.find(operand_token.str) != registers.end()) {
+        return registers.at(operand_token.str);
+    }
+    cerr << "invalid operand " << operand_token.str << endl;
+    exit(1);
+    return NULL;
 }
 
 shared_ptr<vector<uint16_t>> parse(shared_ptr<vector<Token>> tokens) {
     shared_ptr<vector<uint16_t>> output_code(new vector<uint16_t>());
     uint16_t code;
+    shared_ptr<map<string, int>> label_table(new map<string, int>());
     for (int current_pos = 0; current_pos < tokens->size(); current_pos++) {
-        Token *opcode = &tokens->at(current_pos++);
-        Token *first_operand = &tokens->at(current_pos++);
-        Token *second_operand = NULL;
-        if (tokens->at(current_pos).type == TokenType::COMMA) {
-            tokens->at(current_pos++); // comma
-            second_operand = &tokens->at(current_pos++);
-        }
-        string debug_asm = "";
-        code = 0;
-        code |= (assemble_opcode(*opcode) << 12);
-        debug_asm += opcode->str + " ";
-        if (second_operand != NULL) {
-            code |= (assemble_operand(*first_operand) << 9);
-            code |= (assemble_operand(*second_operand) << 6);
-            debug_asm += first_operand->str + ", " + second_operand->str;
+        Token *first_token = &tokens->at(current_pos++);
+        if (first_token->type != TokenType::IDENT) {
+            Token *first_operand = &tokens->at(current_pos++);
+            Token *second_operand = NULL;
+            if (tokens->at(current_pos).type == TokenType::COMMA) {
+                tokens->at(current_pos++); // comma
+                second_operand = &tokens->at(current_pos++);
+            }
+            string debug_asm = "";
+            code = 0;
+            code |= (assemble_opcode(*first_token) << 12);
+            debug_asm += first_token->str + " ";
+            if (second_operand != NULL) {
+                code |= (assemble_operand(*first_operand, label_table) << 9);
+                code |= (assemble_operand(*second_operand, label_table) << 6);
+                debug_asm += first_operand->str + ", " + second_operand->str;
+            } else {
+                code |= (assemble_operand(*first_operand, label_table));
+                debug_asm += first_operand->str;
+            }
+            output_code->push_back(code);
+            cout << debug_asm << "\t" << bitset<16>(code) << endl;
         } else {
-            code |= (assemble_operand(*first_operand));
-            debug_asm += first_operand->str;
+            label_table->insert(make_pair(first_token->str, output_code->size()));
+            current_pos++;
         }
-        output_code->push_back(code);
-        cout << debug_asm << "\t" << bitset<16>(code) << endl;
     }
     return output_code;
 }
@@ -105,7 +115,7 @@ shared_ptr<vector<Token>> tokenize(shared_ptr<string> code_str) {
             current_token_str.clear();
             continue;
         }
-        if (next_char == ' ' || next_char == '\t' || next_char == ',' || next_char == '\n') {
+        if (next_char == ' ' || next_char == '\t' || next_char == ',' || next_char == '\n' || next_char == ':') {
             TokenType token_type = TokenType::IDENT;
             if (current_token_str.substr(0, 2) == "0x") {
                 token_type = TokenType::HEX;
