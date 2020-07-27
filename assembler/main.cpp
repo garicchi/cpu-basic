@@ -81,7 +81,7 @@ shared_ptr<vector<uint16_t>> parse(shared_ptr<vector<Token>> tokens) {
             output_code->push_back(code);
             cout << debug_asm << "\t" << bitset<16>(code) << endl;
         } else {
-            label_table->insert(make_pair(first_token->str, output_code->size()));
+            label_table->insert(make_pair(first_token->str, output_code->size() * 2));
             current_pos++;
         }
     }
