@@ -9,9 +9,9 @@ ldl r3, 0x0A
 loop:
 add r2, r1
 add r0, r2
+st r0, 0x64
 cmp r2, r3
 je else
 jmp loop
 else:
-st r0, 0x64
 hlt

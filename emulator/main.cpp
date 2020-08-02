@@ -5,6 +5,7 @@
 #include <map>
 #include <memory>
 #include <unistd.h>
+#include <iomanip>
 
 using namespace std;
 
@@ -74,7 +75,7 @@ enum class AluMode {
 
 
 map<InstructionType , shared_ptr<Instruction>> instructions;
-
+map<CpuStatus, string> cpu_status_str_map;
 
 const int PSW_REG_NUMBER = 5;
 const int SP_REG_NUMBER = 6;
@@ -92,6 +93,7 @@ uint16_t mem_bus_data = 0;
 uint16_t s_bus = 0;
 uint16_t a_bus = 0;
 uint16_t b_bus = 0;
+int clock_counter = 1;
 
 class Alu {
 public:
@@ -154,6 +156,11 @@ public:
         }
     }
 
+    uint16_t get_negative_flag() {
+        uint16_t mask = 0b1000000000000000;
+        return (registers[PSW_REG_NUMBER] >> 15) & 0x1;
+    }
+
     uint16_t get_zero_flag() {
         uint16_t mask = 0b0100000000000000;
         return (registers[PSW_REG_NUMBER] >> 14) & 0x1;
@@ -166,6 +173,7 @@ CpuStatus current_status = CpuStatus::LOAD_INST_0;
 shared_ptr<Instruction> current_instruction;
 
 
+
 shared_ptr<Instruction> decode_instruction(uint16_t code) {
     uint16_t mask_opcode = 0b0111100000000000;
     uint16_t mask_first_operand = 0b0000011100000000;
@@ -173,15 +181,11 @@ shared_ptr<Instruction> decode_instruction(uint16_t code) {
 
     uint16_t opcode = (code & mask_opcode) >> 11;
     auto inst = instructions[static_cast<InstructionType>(opcode)];
-    cout << "[" << registers[PC_REG_NUMBER] << "] " << inst->mnemonic << " ";
     if (inst->operand_type == OperandType::SINGLE_OPERAND || inst->operand_type == OperandType::DOUBLE_OPERAND) {
         inst->first_operand = (code & mask_first_operand) >> 8;
-        cout << bitset<3>(inst->first_operand) << " ";
         inst->second_operand = code & mask_second_operand;
-        cout << bitset<8>(inst->second_operand) << " ";
     }
 
-    cout << endl;
     return inst;
 }
 
@@ -196,7 +200,8 @@ void store_memory() {
     memory[mem_bus_addr] = mem_bus_data;
 }
 
-void update_status() {
+bool update_status() {
+    bool is_hlt = false;
     switch (current_status) {
         case CpuStatus::LOAD_INST_0:
             a_bus = registers[PC_REG_NUMBER];
@@ -245,8 +250,7 @@ void update_status() {
         case CpuStatus::EXE_INST:
             switch (current_instruction->type) {
                 case InstructionType::HLT:
-                    cout << memory[0x64] << endl;
-                    exit(0);
+                    is_hlt = true;
                     break;
                 case InstructionType::ADD:
                     reg_b = s_bus;
@@ -310,6 +314,7 @@ void update_status() {
             current_status = CpuStatus::LOAD_INST_0;
             break;
     }
+    return is_hlt;
 }
 
 void register_instructions() {
@@ -329,6 +334,64 @@ void register_instructions() {
     }
 }
 
+void print_cpu() {
+    int index = 0;
+    cout << "\033[2J" <<"\033[0;0H";  // clear screen
+    cout << endl << "----------CLOCK------------" << endl;
+    cout << " " << "CLOCK [" << dec << clock_counter << "]" << endl;
+    cout << endl << "-------INSTRUCTION---------" << endl;
+    if (current_instruction != nullptr) {
+        cout << " " << "IR [ " << current_instruction->mnemonic << " ";
+        if (current_instruction->operand_type == OperandType::SINGLE_OPERAND ||
+            current_instruction->operand_type == OperandType::DOUBLE_OPERAND) {
+            cout << bitset<3>(current_instruction->first_operand) << " ";
+            if (current_instruction->operand_type == OperandType::DOUBLE_OPERAND) {
+                cout << bitset<8>(current_instruction->second_operand) << " ";
+            }
+        }
+        cout << "]" << endl;
+    }
+    cout << endl << "------STATUS COUNTER--------" << endl;
+    for (int i = 0; i < cpu_status_str_map.size(); i++) {
+        cout << " " << cpu_status_str_map[static_cast<CpuStatus>(i)] << " ";
+        if (current_status == static_cast<CpuStatus>(i)) {
+            cout << " <";
+        }
+        cout << endl;
+    }
+    cout << endl << "---------REGISTER-----------" << endl;
+    for(uint16_t reg: registers) {
+        stringstream hex_str;
+        cout << " " <<  "R[" << index << "] [" << bitset<16>(reg) << "] (0x" << hex << reg << ") ";
+        if (index == PC_REG_NUMBER) {
+            cout << " (PC) ";
+        }
+        if (index == SP_REG_NUMBER) {
+            cout << " (SP) ";
+        }
+        if (index == PSW_REG_NUMBER) {
+            cout << "N = "<< alu->get_negative_flag() << " ";
+            cout << "Z = "<< alu->get_zero_flag() << " ";
+            cout << " (PSW) ";
+        }
+        cout << endl;
+        index++;
+    }
+    cout << endl << "----------MEMORY------------" << endl;
+    int min_memory_index = (registers[PC_REG_NUMBER] - 2) >= 0 ? registers[PC_REG_NUMBER] - 2 : 0;
+    for (int i = min_memory_index; i < (min_memory_index + 5); i++) {
+        cout << " " << "[0x" << hex << i << "] [" << bitset<16>(memory[i]) << "] ";
+        if (i == registers[PC_REG_NUMBER]) {
+            cout << "(PC)";
+        }
+        cout << endl;
+    }
+    cout << endl;
+    cout << " " << "[0x64] [" << bitset<16>(memory[0x64]) << "] (" << dec << memory[0x64] << ") " << endl;
+    cout << "--------------------------" << endl;
+}
+
+
 int main(int argc, char *argv[]) {
     char *program_file = argv[1];
     ifstream ifs(program_file,ios::in | ios::binary);
@@ -343,14 +406,24 @@ int main(int argc, char *argv[]) {
     }
 
     register_instructions();
+    cpu_status_str_map[CpuStatus::LOAD_INST_0] = "LOAD_INST_0";
+    cpu_status_str_map[CpuStatus::LOAD_INST_1] = "LOAD_INST_1";
+    cpu_status_str_map[CpuStatus::LOAD_OPERAND_0] = "LOAD_OPERAND_0";
+    cpu_status_str_map[CpuStatus::LOAD_OPERAND_1] = "LOAD_OPERAND_1";
+    cpu_status_str_map[CpuStatus::EXE_INST] = "EXE_INST";
+    cpu_status_str_map[CpuStatus::STORE] = "STORE";
 
-    char input;
+    clock_counter = 1;
     while(true) {
-        update_status();
-        //cout << "r0 " << bitset<16>(registers[0]) << endl;
-        //cout << "r2 " << bitset<16>(registers[2]) << endl;
+        if (update_status()) {
+            break;
+        }
+        print_cpu();
         usleep(100000);
+        clock_counter++;
     }
+
+    cout << "RESULT is [" << memory[0x64] << "]" << endl;
 
     return 0;
 }
