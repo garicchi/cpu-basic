@@ -5,7 +5,7 @@ ldl r1, 0x01
 ldh r2, 0x00
 ldl r2, 0x00
 ldh r3, 0x00
-ldl r3, 0x0A
+ldl r3, 0x03
 loop:
 add r2, r1
 add r0, r2
