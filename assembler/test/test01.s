@@ -1,6 +1,17 @@
-mov r1, r0
-mov r1, r0
-mov r1, r0
-mov r1, r0
-test02:
-mov test02
+ldh r0, 0x00
+ldl r0, 0x00
+ldh r1, 0x00
+ldl r1, 0x01
+ldh r2, 0x00
+ldl r2, 0x00
+ldh r3, 0x00
+ldl r3, 0x0A
+loop:
+add r2, r1
+add r0, r2
+cmp r2, r3
+je else
+jmp loop
+else:
+st r0, 0x64
+hlt

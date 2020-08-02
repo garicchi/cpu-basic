@@ -3,4 +3,4 @@ project(assembler)
 
 set(CMAKE_CXX_STANDARD 14)
 
-add_executable(assembler main.cpp token.hpp)
+add_executable(assembler main.cpp)
