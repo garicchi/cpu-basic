@@ -51,12 +51,12 @@ public:
 };
 
 enum class CpuStatus {
-    LOAD_INST_0,
-    LOAD_INST_1,
-    LOAD_OPERAND_0,
-    LOAD_OPERAND_1,
-    EXE_INST,
-    STORE,
+    FETCH_INST_0,
+    FETCH_INST_1,
+    FETCH_OPERAND_0,
+    FETCH_OPERAND_1,
+    EXEC_INST,
+    WRITE_BACK,
 };
 
 enum class AluMode {
@@ -169,7 +169,7 @@ public:
 
 shared_ptr<Alu> alu(new Alu());
 
-CpuStatus current_status = CpuStatus::LOAD_INST_0;
+CpuStatus current_status = CpuStatus::FETCH_INST_0;
 shared_ptr<Instruction> current_instruction;
 
 
@@ -203,20 +203,20 @@ void store_memory() {
 bool update_status() {
     bool is_hlt = false;
     switch (current_status) {
-        case CpuStatus::LOAD_INST_0:
+        case CpuStatus::FETCH_INST_0:
             a_bus = registers[PC_REG_NUMBER];
             alu->mode = AluMode::NOP;
             s_bus = alu->calc(a_bus, b_bus);
-            current_status = CpuStatus::LOAD_INST_1;
+            current_status = CpuStatus::FETCH_INST_1;
             break;
-        case CpuStatus::LOAD_INST_1:
+        case CpuStatus::FETCH_INST_1:
             mar = s_bus;
             load_memory();
             alu->mode = AluMode::INC;
             s_bus = alu->calc(a_bus, b_bus);
-            current_status = CpuStatus::LOAD_OPERAND_0;
+            current_status = CpuStatus::FETCH_OPERAND_0;
             break;
-        case CpuStatus::LOAD_OPERAND_0:
+        case CpuStatus::FETCH_OPERAND_0:
             ir = mem_bus_data;
             current_instruction = decode_instruction(ir);
             registers[PC_REG_NUMBER] = s_bus;
@@ -227,27 +227,27 @@ bool update_status() {
                 || current_instruction->type == InstructionType::OR
                 || current_instruction->type == InstructionType::CMP) {
                 a_bus = registers[current_instruction->second_operand >> 5];
-                current_status = CpuStatus::EXE_INST;
+                current_status = CpuStatus::EXEC_INST;
             } else if (current_instruction->type == InstructionType::LD || current_instruction->type == InstructionType::ST) {
                 a_bus = current_instruction->second_operand;
-                current_status = CpuStatus::LOAD_OPERAND_1;
+                current_status = CpuStatus::FETCH_OPERAND_1;
             } else {
-                current_status = CpuStatus::EXE_INST;
+                current_status = CpuStatus::EXEC_INST;
             }
             alu->mode = AluMode::NOP;
             s_bus = alu->calc(a_bus, b_bus);
 
             break;
-        case CpuStatus::LOAD_OPERAND_1:
+        case CpuStatus::FETCH_OPERAND_1:
             mar = s_bus;
             if (current_instruction->type == InstructionType::LD) {
                 load_memory();
             }
             alu->mode = AluMode::NOP;
             s_bus = alu->calc(a_bus, b_bus);
-            current_status = CpuStatus::EXE_INST;
+            current_status = CpuStatus::EXEC_INST;
             break;
-        case CpuStatus::EXE_INST:
+        case CpuStatus::EXEC_INST:
             switch (current_instruction->type) {
                 case InstructionType::HLT:
                     is_hlt = true;
@@ -294,9 +294,9 @@ bool update_status() {
             }
             s_bus = alu->calc(a_bus, b_bus);
 
-            current_status = CpuStatus::STORE;
+            current_status = CpuStatus::WRITE_BACK;
             break;
-        case CpuStatus::STORE:
+        case CpuStatus::WRITE_BACK:
             if (current_instruction->type == InstructionType::ST) {
                 mdr = s_bus;
                 store_memory();
@@ -311,7 +311,7 @@ bool update_status() {
             } else {
                 registers[current_instruction->first_operand] = s_bus;
             }
-            current_status = CpuStatus::LOAD_INST_0;
+            current_status = CpuStatus::FETCH_INST_0;
             break;
     }
     return is_hlt;
@@ -406,12 +406,12 @@ int main(int argc, char *argv[]) {
     }
 
     register_instructions();
-    cpu_status_str_map[CpuStatus::LOAD_INST_0] = "LOAD_INST_0";
-    cpu_status_str_map[CpuStatus::LOAD_INST_1] = "LOAD_INST_1";
-    cpu_status_str_map[CpuStatus::LOAD_OPERAND_0] = "LOAD_OPERAND_0";
-    cpu_status_str_map[CpuStatus::LOAD_OPERAND_1] = "LOAD_OPERAND_1";
-    cpu_status_str_map[CpuStatus::EXE_INST] = "EXE_INST";
-    cpu_status_str_map[CpuStatus::STORE] = "STORE";
+    cpu_status_str_map[CpuStatus::FETCH_INST_0] = "FETCH_INST_0";
+    cpu_status_str_map[CpuStatus::FETCH_INST_1] = "FETCH_INST_1";
+    cpu_status_str_map[CpuStatus::FETCH_OPERAND_0] = "FETCH_OPERAND_0";
+    cpu_status_str_map[CpuStatus::FETCH_OPERAND_1] = "FETCH_OPERAND_1";
+    cpu_status_str_map[CpuStatus::EXEC_INST] = "EXEC_INST";
+    cpu_status_str_map[CpuStatus::WRITE_BACK] = "WRITE_BACK";
 
     clock_counter = 1;
     while(true) {

@@ -3,4 +3,4 @@ project(emulator)
 
 set(CMAKE_CXX_STANDARD 14)
 
-add_executable(emulator main.cpp)
+add_executable(emulator main.cpp alu.hpp)
