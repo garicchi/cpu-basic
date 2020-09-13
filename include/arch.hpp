@@ -143,12 +143,13 @@ public:
 
     static uint16_t assemble(Program p) {
         uint16_t code = 0;
+
         code |= p.inst->opcode << 11;
         if (p.inst->operand_type == OperandType::SINGLE_OPERAND) {
-            code |= p.first_operand << 8;
+            code |= p.first_operand;
         } else if (p.inst->operand_type == OperandType::DOUBLE_OPERAND) {
             code |= p.first_operand << 8;
-            code |= p.second_operand << 5;
+            code |= p.second_operand;
         }
         return code;
     }

@@ -47,25 +47,30 @@ uint16_t resolve_operand(Token operand_token, shared_ptr<map<string, int>> label
 shared_ptr<vector<uint16_t>> generate(shared_ptr<vector<Token>> tokens) {
     shared_ptr<map<string, int>> label_table(new map<string, int>());
     int code_index = 0;
-    for (int current_pos = 0; current_pos < tokens->size(); current_pos++) {
+    for (int current_pos = 0; current_pos < tokens->size();) {
         Token *first_token = &tokens->at(current_pos);
-        Token *second_token = nullptr;
-        if ((current_pos + 1) < tokens->size()) {
-            second_token = &tokens->at(current_pos + 1);
+        Token *second_token = &tokens->at(current_pos + 1);
+
+        if (first_token->type == TokenType::EOL) {
+            current_pos++;
+            continue;
         }
-        if (second_token != nullptr) {
-            if (first_token->type == TokenType::IDENT && second_token->type == TokenType::COLON) {
-                label_table->insert(make_pair(first_token->str, code_index));
-            }
-            if (second_token->type == TokenType::EOL && first_token->type != TokenType::COLON) {
-                code_index++;
-            }
+        if (first_token->type == TokenType::IDENT && second_token->type == TokenType::COLON) {
+            label_table->insert(make_pair(first_token->str, code_index));
+            current_pos += 3;
+            continue;
         }
+        if (second_token->type == TokenType::EOL && first_token->type != TokenType::COLON) {
+            code_index++;
+            current_pos += 2;
+            continue;
+        }
+        current_pos++;
     }
     vector<Program> programs;
-    for (int current_pos = 0; current_pos < tokens->size(); current_pos++) {
+    for (int current_pos = 0; current_pos < tokens->size();) {
         Token *first_token = &tokens->at(current_pos++);
-        if (first_token->type != TokenType::IDENT) {
+        if (first_token->type != TokenType::IDENT && first_token->type != TokenType::EOL) {
             Token *first_operand_token = NULL;
             Token *second_operand_token = NULL;
             if (tokens->at(current_pos).type != TokenType::EOL && tokens->at(current_pos).type != TokenType::COMMA) {
@@ -77,6 +82,9 @@ shared_ptr<vector<uint16_t>> generate(shared_ptr<vector<Token>> tokens) {
             }
 
             shared_ptr<Instruction> inst = get_inst_by_mnemonic(first_token->str);
+            if (inst == nullptr) {
+                cout << "invalid inst [" << first_token->str << "]" << endl;
+            }
             uint16_t first_operand = 0;
             uint16_t second_operand = 0;
 
@@ -84,11 +92,18 @@ shared_ptr<vector<uint16_t>> generate(shared_ptr<vector<Token>> tokens) {
                 first_operand = resolve_operand(*first_operand_token, label_table);
             } else if (inst->operand_type == OperandType::DOUBLE_OPERAND) {
                 first_operand = resolve_operand(*first_operand_token, label_table);
-                second_operand = resolve_operand(*second_operand_token, label_table);
+                if (second_operand_token->type == TokenType::RESERVED) {
+                    second_operand = resolve_operand(*second_operand_token, label_table) << 5;
+                } else {
+                    second_operand = resolve_operand(*second_operand_token, label_table);
+                }
+
             }
             programs.push_back(Program(inst, first_operand, second_operand));
         } else {
-            current_pos++;
+            if (first_token->type == TokenType::IDENT) {
+                current_pos++;
+            }
         }
     }
     shared_ptr<vector<uint16_t>> output_code(new vector<uint16_t>());
@@ -99,9 +114,9 @@ shared_ptr<vector<uint16_t>> generate(shared_ptr<vector<Token>> tokens) {
         string debug_asm = "[" + to_string(output_code->size()) + "] ";
         debug_asm += program.inst->mnemonic + " ";
         if (program.inst->operand_type == OperandType::SINGLE_OPERAND) {
-            debug_asm += bitset<11>(program.first_operand).to_string();
+            debug_asm += to_string(program.first_operand);
         } else if (program.inst->operand_type == OperandType::DOUBLE_OPERAND) {
-            debug_asm += bitset<3>(program.first_operand).to_string() + ", " + bitset<8>(program.second_operand).to_string();
+            debug_asm += to_string(program.first_operand) + ", " + to_string(program.second_operand);
         }
         cout << debug_asm << "\t" << bitset<16>(code) << endl;
     }
@@ -111,15 +126,26 @@ shared_ptr<vector<uint16_t>> generate(shared_ptr<vector<Token>> tokens) {
 shared_ptr<vector<Token>> tokenize(shared_ptr<string> code_str) {
     shared_ptr<vector<Token>> tokens(new vector<Token>());
     string current_token_str;
+    bool is_among_comment = false;
     for (int current_pos = 0; current_pos < code_str->length(); current_pos++) {
         char current_char = code_str->at(current_pos);
         char next_char = NULL;
         if ((current_pos + 1) < code_str->length()) {
             next_char = code_str->at(current_pos + 1);
         }
+        if (current_char == '#') {
+            is_among_comment = true;
+        }
+        if (is_among_comment && current_char == '\n') {
+            is_among_comment = false;
+        }
+        if (is_among_comment) {
+            continue;
+        }
         if (current_char != ' ' && current_char != '\t') {
             current_token_str.push_back(current_char);
         }
+
         if (current_char == ',' || current_char == ':' || current_char == '\n') {
             TokenType token_type = TokenType::COMMA;
             if (current_char == ',') {
