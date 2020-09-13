@@ -32,3 +32,8 @@
 *.app
 .idea
 cmake-build-debug
+CMakeFiles
+CMakeCache.txt
+peda-session-*
+cmake_install.cmake
+*.cbp

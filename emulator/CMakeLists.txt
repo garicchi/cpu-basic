@@ -1,6 +1,7 @@
-cmake_minimum_required(VERSION 3.17)
-project(emulator)
+cmake_minimum_required(VERSION 3.16)
 
-set(CMAKE_CXX_STANDARD 14)
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/../include)
 
-add_executable(emulator main.cpp alu.hpp psw.hpp memory.hpp inst.hpp cpu.hpp)
+AUX_SOURCE_DIRECTORY(${CMAKE_CURRENT_SOURCE_DIR} source)
+
+add_executable(emulator ${source})

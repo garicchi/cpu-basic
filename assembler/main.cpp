@@ -4,6 +4,7 @@
 #include <memory>
 #include <map>
 #include <bitset>
+#include "arch.hpp"
 
 // 15  14 13 12 11   10 9 8   7 6 5   4 3 2 1 0
 // -   命令           source   dest    ----
@@ -12,26 +13,6 @@
 // -   命令           source   data
 
 using namespace std;
-
-map<string, uint16_t> instructions = {
-        {"mov", 0b0000},
-        {"add", 0b0001},
-        {"ldl", 0b1000},
-        {"ldh", 0b1001},
-        {"cmp", 0b1010},
-        {"je", 0b1011},
-        {"jmp", 0b1100},
-        {"ld", 0b1101},
-        {"st", 0b1110},
-        {"hlt", 0b1111}
-};
-
-map<string, uint16_t> registers = {
-        {"r0", 0b000},
-        {"r1", 0b001},
-        {"r2", 0b010},
-        {"r3", 0b011},
-};
 
 enum class TokenType {
     RESERVED,
@@ -47,23 +28,16 @@ struct Token {
     TokenType type;
 };
 
-uint16_t assemble_opcode(Token opcode_token) {
-    if (instructions.find(opcode_token.str) == instructions.end()) {
-        cerr << "invalid opcode " << opcode_token.str << endl;
-        exit(1);
-    }
-    return instructions[opcode_token.str];
-}
-
-uint16_t assemble_operand(Token operand_token, shared_ptr<map<string, int>> label_table) {
+uint16_t resolve_operand(Token operand_token, shared_ptr<map<string, int>> label_table) {
     if (operand_token.type == TokenType::HEX) {
         return stoi(operand_token.str, 0, 16);
     }
     if (label_table->find(operand_token.str) != label_table->end()) {
         return label_table->at(operand_token.str);
     }
-    if (registers.find(operand_token.str) != registers.end()) {
-        return registers.at(operand_token.str);
+    auto reg = get_register_by_name(operand_token.str);
+    if (reg != nullptr) {
+        return reg->code;
     }
     cerr << "invalid operand " << operand_token.str << endl;
     exit(1);
@@ -71,8 +45,6 @@ uint16_t assemble_operand(Token operand_token, shared_ptr<map<string, int>> labe
 }
 
 shared_ptr<vector<uint16_t>> generate(shared_ptr<vector<Token>> tokens) {
-    shared_ptr<vector<uint16_t>> output_code(new vector<uint16_t>());
-    uint16_t code;
     shared_ptr<map<string, int>> label_table(new map<string, int>());
     int code_index = 0;
     for (int current_pos = 0; current_pos < tokens->size(); current_pos++) {
@@ -90,40 +62,48 @@ shared_ptr<vector<uint16_t>> generate(shared_ptr<vector<Token>> tokens) {
             }
         }
     }
+    vector<Program> programs;
     for (int current_pos = 0; current_pos < tokens->size(); current_pos++) {
         Token *first_token = &tokens->at(current_pos++);
         if (first_token->type != TokenType::IDENT) {
-            //Token *first_operand = &tokens->at(current_pos++);
-            Token *first_operand = NULL;
-            Token *second_operand = NULL;
+            Token *first_operand_token = NULL;
+            Token *second_operand_token = NULL;
             if (tokens->at(current_pos).type != TokenType::EOL && tokens->at(current_pos).type != TokenType::COMMA) {
-                first_operand = &tokens->at(current_pos++);
+                first_operand_token = &tokens->at(current_pos++);
             }
             if (tokens->at(current_pos).type == TokenType::COMMA) {
                 tokens->at(current_pos++); // comma
-                second_operand = &tokens->at(current_pos++);
+                second_operand_token = &tokens->at(current_pos++);
             }
-            string debug_asm = "[" + to_string(output_code->size()) + "] ";
-            code = 0;
-            code |= (assemble_opcode(*first_token) << 11);
-            debug_asm += first_token->str + " ";
-            if (first_operand != NULL && second_operand != NULL) {
-                code |= (assemble_operand(*first_operand, label_table) << 8);
-                if (second_operand->type == TokenType::RESERVED) {
-                    code |= (assemble_operand(*second_operand, label_table) << 5);
-                } else {
-                    code |= (assemble_operand(*second_operand, label_table));
-                }
-                debug_asm += first_operand->str + ", " + second_operand->str;
-            } else if (first_operand != NULL) {
-                code |= (assemble_operand(*first_operand, label_table));
-                debug_asm += first_operand->str;
+
+            shared_ptr<Instruction> inst = get_inst_by_mnemonic(first_token->str);
+            uint16_t first_operand = 0;
+            uint16_t second_operand = 0;
+
+            if (inst->operand_type == OperandType::SINGLE_OPERAND) {
+                first_operand = resolve_operand(*first_operand_token, label_table);
+            } else if (inst->operand_type == OperandType::DOUBLE_OPERAND) {
+                first_operand = resolve_operand(*first_operand_token, label_table);
+                second_operand = resolve_operand(*second_operand_token, label_table);
             }
-            output_code->push_back(code);
-            cout << debug_asm << "\t" << bitset<16>(code) << endl;
+            programs.push_back(Program(inst, first_operand, second_operand));
         } else {
             current_pos++;
         }
+    }
+    shared_ptr<vector<uint16_t>> output_code(new vector<uint16_t>());
+    uint16_t code;
+    for (auto program: programs) {
+        code = Program::assemble(program);
+        output_code->push_back(code);
+        string debug_asm = "[" + to_string(output_code->size()) + "] ";
+        debug_asm += program.inst->mnemonic + " ";
+        if (program.inst->operand_type == OperandType::SINGLE_OPERAND) {
+            debug_asm += bitset<11>(program.first_operand).to_string();
+        } else if (program.inst->operand_type == OperandType::DOUBLE_OPERAND) {
+            debug_asm += bitset<3>(program.first_operand).to_string() + ", " + bitset<8>(program.second_operand).to_string();
+        }
+        cout << debug_asm << "\t" << bitset<16>(code) << endl;
     }
     return output_code;
 }
@@ -163,12 +143,14 @@ shared_ptr<vector<Token>> tokenize(shared_ptr<string> code_str) {
             if (current_token_str.substr(0, 2) == "0x") {
                 token_type = TokenType::HEX;
             }
-            if (instructions.find(current_token_str) != instructions.end()) {
+
+            if (get_inst_by_mnemonic(current_token_str) != nullptr) {
                 token_type = TokenType::RESERVED;
             }
-            if (registers.find(current_token_str) != registers.end()) {
+            if (get_register_by_name(current_token_str) != nullptr) {
                 token_type = TokenType::RESERVED;
             }
+
             Token token;
             token.str = current_token_str;
             token.type = token_type;
