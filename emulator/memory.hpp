@@ -1,7 +1,3 @@
-//
-// Created by garicchi on 2020/08/02.
-//
-
 #ifndef EMULATOR_MEMORY_HPP
 #define EMULATOR_MEMORY_HPP
 

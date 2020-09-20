@@ -1,7 +1,3 @@
-//
-// Created by garicchi on 2020/08/02.
-//
-
 #ifndef EMULATOR_PSW_HPP
 #define EMULATOR_PSW_HPP
 

@@ -1,7 +1,3 @@
-//
-// Created by garicchi on 2020/08/03.
-//
-
 #ifndef EMULATOR_CPU_HPP
 #define EMULATOR_CPU_HPP
 
@@ -117,6 +113,7 @@ public:
     Cpu(shared_ptr<Memory> memory, shared_ptr<CpuArch> arch) {
         clock_counter = 1;
 
+        // デバッグしやすいように文字列にしておく
         statuses[CpuStatus::FETCH_INST_0] = "FETCH_INST_0";
         statuses[CpuStatus::FETCH_INST_1] = "FETCH_INST_1";
         statuses[CpuStatus::FETCH_OPERAND_0] = "FETCH_OPERAND_0";
@@ -134,6 +131,7 @@ public:
         this->alu = shared_ptr<Alu>(new Alu(this->psw));
     }
 
+    // クロック時の処理
     bool clock() {
         bool is_hlt = false;
         switch (current_status) {
