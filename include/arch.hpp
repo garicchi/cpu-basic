@@ -7,6 +7,12 @@
 #ifndef CPU_BASIC_ARCH_HPP
 #define CPU_BASIC_ARCH_HPP
 
+// 15  14 13 12 11   10 9 8   7 6 5   4 3 2 1 0
+// -   命令           source   dest    ----
+
+// 15  14 13 12 11   10 9 8   7 6 5 4 3 2 1 0
+// -   命令           source   data
+
 using namespace std;
 
 enum class InstructionType {
@@ -55,87 +61,99 @@ class Register {
 public:
     string name;
     uint16_t code;
+    Register() {
+
+    }
     Register(string name, uint16_t code) {
         this->name = name;
         this->code = code;
     }
 };
 
+class CpuArch {
+public:
+    vector<Instruction> instructions = {
+            Instruction(InstructionType::MOV, "mov", 0b0000, OperandType::DOUBLE_OPERAND),
+            Instruction(InstructionType::ADD, "add", 0b0001, OperandType::DOUBLE_OPERAND),
+            Instruction(InstructionType::LDL, "ldl", 0b1000, OperandType::DOUBLE_OPERAND),
+            Instruction(InstructionType::LDH, "ldh", 0b1001, OperandType::DOUBLE_OPERAND),
+            Instruction(InstructionType::CMP, "cmp", 0b1010, OperandType::DOUBLE_OPERAND),
+            Instruction(InstructionType::JE, "je", 0b1011, OperandType::SINGLE_OPERAND),
+            Instruction(InstructionType::JMP, "jmp", 0b1100, OperandType::SINGLE_OPERAND),
+            Instruction(InstructionType::LD, "ld", 0b1101, OperandType::DOUBLE_OPERAND),
+            Instruction(InstructionType::ST, "st", 0b1110, OperandType::DOUBLE_OPERAND),
+            Instruction(InstructionType::HLT, "hlt", 0b1111, OperandType::NO_OPERAND)
+    };
 
-vector<shared_ptr<Instruction>> INSTRUCTIONS = {
-        make_shared<Instruction>(InstructionType::MOV, "mov", 0b0000, OperandType::DOUBLE_OPERAND),
-        make_shared<Instruction>(InstructionType::ADD, "add", 0b0001, OperandType::DOUBLE_OPERAND),
-        make_shared<Instruction>(InstructionType::LDL, "ldl", 0b1000, OperandType::DOUBLE_OPERAND),
-        make_shared<Instruction>(InstructionType::LDH, "ldh", 0b1001, OperandType::DOUBLE_OPERAND),
-        make_shared<Instruction>(InstructionType::CMP, "cmp", 0b1010, OperandType::DOUBLE_OPERAND),
-        make_shared<Instruction>(InstructionType::JE, "je", 0b1011, OperandType::SINGLE_OPERAND),
-        make_shared<Instruction>(InstructionType::JMP, "jmp", 0b1100, OperandType::SINGLE_OPERAND),
-        make_shared<Instruction>(InstructionType::LD, "ld", 0b1101, OperandType::DOUBLE_OPERAND),
-        make_shared<Instruction>(InstructionType::ST, "st", 0b1110, OperandType::DOUBLE_OPERAND),
-        make_shared<Instruction>(InstructionType::HLT, "hlt", 0b1111, OperandType::NO_OPERAND)
+    vector<Register> registers = {
+            Register("r0", 0b000),
+            Register("r1", 0b001),
+            Register("r2", 0b010),
+            Register("r3", 0b011)
+    };
+
+    CpuArch() {
+
+    }
+
+    tuple<Instruction, bool> try_inst_by_mnemonic(string mnemonic) {
+        int find_index = -1;
+        for (int i = 0; i < this->instructions.size(); i++) {
+            if (this->instructions[i].mnemonic == mnemonic) {
+                find_index = i;
+                break;
+            }
+        }
+        if (find_index >= 0) {
+            return tuple<Instruction, bool>(this->instructions[find_index], true);
+        } else {
+            return tuple<Instruction, bool>(Instruction(), false);
+        }
+    }
+
+    tuple<Instruction, bool> try_inst_by_opcode(uint16_t opcode) {
+        int find_index = -1;
+        for (int i = 0; i < this->instructions.size(); i++) {
+            if (this->instructions[i].opcode == opcode) {
+                find_index = i;
+                break;
+            }
+        }
+        if (find_index >= 0) {
+            return tuple<Instruction, bool>(this->instructions[find_index], true);
+        } else {
+            return tuple<Instruction, bool>(Instruction(), false);
+        }
+    }
+
+    tuple<Register, bool> try_register_by_name(string name) {
+        int find_index = -1;
+        for (int i = 0; i < this->registers.size(); i++) {
+            if (this->registers[i].name == name) {
+                find_index = i;
+                break;
+            }
+        }
+        if (find_index >= 0) {
+            return tuple<Register, bool>(this->registers[find_index], true);
+        } else {
+            return tuple<Register, bool>(Register(), false);
+        }
+    }
+
+
 };
 
-shared_ptr<Instruction> get_inst_by_mnemonic(string mnemonic) {
-    int find_index = -1;
-    for (int i = 0; i < INSTRUCTIONS.size(); i++) {
-        if (INSTRUCTIONS[i]->mnemonic == mnemonic) {
-            find_index = i;
-            break;
-        }
-    }
-    if (find_index >= 0) {
-        return INSTRUCTIONS[find_index];
-    } else {
-        return nullptr;
-    }
-}
-
-shared_ptr<Instruction> get_inst_by_opcode(uint16_t opcode) {
-    int find_index = -1;
-    for (int i = 0; i < INSTRUCTIONS.size(); i++) {
-        if (INSTRUCTIONS[i]->opcode == opcode) {
-            find_index = i;
-            break;
-        }
-    }
-    if (find_index >= 0) {
-        return INSTRUCTIONS[find_index];
-    } else {
-        return nullptr;
-    }
-}
-
-vector<shared_ptr<Register>> REGISTERS = {
-        make_shared<Register>("r0", 0b000),
-        make_shared<Register>("r1", 0b001),
-        make_shared<Register>("r2", 0b010),
-        make_shared<Register>("r3", 0b011)
-};
-
-shared_ptr<Register> get_register_by_name(string name) {
-    int find_index = -1;
-    for (int i = 0; i < REGISTERS.size(); i++) {
-        if (REGISTERS[i]->name == name) {
-            find_index = i;
-            break;
-        }
-    }
-    if (find_index >= 0) {
-        return REGISTERS[find_index];
-    } else {
-        return nullptr;
-    }
-}
 
 class Program {
 public:
-    shared_ptr<Instruction> inst;
+    Instruction inst;
     uint16_t first_operand;
     uint16_t second_operand;
     Program() {
 
     }
-    Program(shared_ptr<Instruction> inst, uint16_t first_operand, uint16_t second_operand) {
+    Program(Instruction inst, uint16_t first_operand, uint16_t second_operand) {
         this->inst = inst;
         this->first_operand = first_operand;
         this->second_operand = second_operand;
@@ -144,36 +162,31 @@ public:
     static uint16_t assemble(Program p) {
         uint16_t code = 0;
 
-        code |= p.inst->opcode << 11;
-        if (p.inst->operand_type == OperandType::SINGLE_OPERAND) {
+        code |= p.inst.opcode << 11;
+        if (p.inst.operand_type == OperandType::SINGLE_OPERAND) {
             code |= p.first_operand;
-        } else if (p.inst->operand_type == OperandType::DOUBLE_OPERAND) {
+        } else if (p.inst.operand_type == OperandType::DOUBLE_OPERAND) {
             code |= p.first_operand << 8;
             code |= p.second_operand;
         }
         return code;
     }
 
-    static shared_ptr<Program> deassemble(uint16_t code) {
+    static Program deassemble(uint16_t code, shared_ptr<CpuArch> arch) {
         uint16_t mask_opcode = 0b0111100000000000;
         uint16_t mask_first_operand = 0b0000011100000000;
         uint16_t mask_second_operand = 0b0000000011111111;
 
         uint16_t opcode = (code & mask_opcode) >> 11;
-        shared_ptr<Instruction> inst = nullptr;
-        for(auto i: INSTRUCTIONS) {
-            if (i->opcode == opcode) {
-                inst = i;
-                break;
-            }
-        }
-        if (inst == nullptr) {
+        auto inst_result = arch->try_inst_by_opcode(opcode);
+
+        if (!get<1>(inst_result)) {
             cerr << "invalid opcode " << opcode << endl;
             exit(1);
         }
         uint16_t first_operand = (code & mask_first_operand) >> 8;
         uint16_t second_operand = (code & mask_second_operand);
-        return make_shared<Program>(inst, first_operand, second_operand);
+        return Program(get<0>(inst_result), first_operand, second_operand);
     }
 
 };

@@ -6,12 +6,6 @@
 #include <bitset>
 #include "arch.hpp"
 
-// 15  14 13 12 11   10 9 8   7 6 5   4 3 2 1 0
-// -   命令           source   dest    ----
-
-// 15  14 13 12 11   10 9 8   7 6 5 4 3 2 1 0
-// -   命令           source   data
-
 using namespace std;
 
 enum class TokenType {
@@ -28,23 +22,24 @@ struct Token {
     TokenType type;
 };
 
-uint16_t resolve_operand(Token operand_token, shared_ptr<map<string, int>> label_table) {
+uint16_t resolve_operand(shared_ptr<CpuArch> arch, Token operand_token, shared_ptr<map<string, int>> label_table) {
     if (operand_token.type == TokenType::HEX) {
         return stoi(operand_token.str, 0, 16);
     }
     if (label_table->find(operand_token.str) != label_table->end()) {
         return label_table->at(operand_token.str);
     }
-    auto reg = get_register_by_name(operand_token.str);
-    if (reg != nullptr) {
-        return reg->code;
+    auto reg = arch->try_register_by_name(operand_token.str);
+
+    if (!get<1>(reg)) {
+        return get<0>(reg).code;
     }
     cerr << "invalid operand " << operand_token.str << endl;
     exit(1);
     return NULL;
 }
 
-shared_ptr<vector<uint16_t>> generate(shared_ptr<vector<Token>> tokens) {
+shared_ptr<vector<uint16_t>> generate(shared_ptr<CpuArch> arch, shared_ptr<vector<Token>> tokens) {
     shared_ptr<map<string, int>> label_table(new map<string, int>());
     int code_index = 0;
     for (int current_pos = 0; current_pos < tokens->size();) {
@@ -81,21 +76,22 @@ shared_ptr<vector<uint16_t>> generate(shared_ptr<vector<Token>> tokens) {
                 second_operand_token = &tokens->at(current_pos++);
             }
 
-            shared_ptr<Instruction> inst = get_inst_by_mnemonic(first_token->str);
-            if (inst == nullptr) {
+            auto try_inst = arch->try_inst_by_mnemonic(first_token->str);
+            if (!get<1>(try_inst)) {
                 cout << "invalid inst [" << first_token->str << "]" << endl;
             }
             uint16_t first_operand = 0;
             uint16_t second_operand = 0;
 
-            if (inst->operand_type == OperandType::SINGLE_OPERAND) {
-                first_operand = resolve_operand(*first_operand_token, label_table);
-            } else if (inst->operand_type == OperandType::DOUBLE_OPERAND) {
-                first_operand = resolve_operand(*first_operand_token, label_table);
+            auto inst = get<0>(try_inst);
+            if (inst.operand_type == OperandType::SINGLE_OPERAND) {
+                first_operand = resolve_operand(arch, *first_operand_token, label_table);
+            } else if (inst.operand_type == OperandType::DOUBLE_OPERAND) {
+                first_operand = resolve_operand(arch, *first_operand_token, label_table);
                 if (second_operand_token->type == TokenType::RESERVED) {
-                    second_operand = resolve_operand(*second_operand_token, label_table) << 5;
+                    second_operand = resolve_operand(arch, *second_operand_token, label_table) << 5;
                 } else {
-                    second_operand = resolve_operand(*second_operand_token, label_table);
+                    second_operand = resolve_operand(arch, *second_operand_token, label_table);
                 }
 
             }
@@ -112,10 +108,10 @@ shared_ptr<vector<uint16_t>> generate(shared_ptr<vector<Token>> tokens) {
         code = Program::assemble(program);
         output_code->push_back(code);
         string debug_asm = "[" + to_string(output_code->size()) + "] ";
-        debug_asm += program.inst->mnemonic + " ";
-        if (program.inst->operand_type == OperandType::SINGLE_OPERAND) {
+        debug_asm += program.inst.mnemonic + " ";
+        if (program.inst.operand_type == OperandType::SINGLE_OPERAND) {
             debug_asm += to_string(program.first_operand);
-        } else if (program.inst->operand_type == OperandType::DOUBLE_OPERAND) {
+        } else if (program.inst.operand_type == OperandType::DOUBLE_OPERAND) {
             debug_asm += to_string(program.first_operand) + ", " + to_string(program.second_operand);
         }
         cout << debug_asm << "\t" << bitset<16>(code) << endl;
@@ -123,7 +119,7 @@ shared_ptr<vector<uint16_t>> generate(shared_ptr<vector<Token>> tokens) {
     return output_code;
 }
 
-shared_ptr<vector<Token>> tokenize(shared_ptr<string> code_str) {
+shared_ptr<vector<Token>> tokenize(shared_ptr<CpuArch> arch, shared_ptr<string> code_str) {
     shared_ptr<vector<Token>> tokens(new vector<Token>());
     string current_token_str;
     bool is_among_comment = false;
@@ -170,10 +166,12 @@ shared_ptr<vector<Token>> tokenize(shared_ptr<string> code_str) {
                 token_type = TokenType::HEX;
             }
 
-            if (get_inst_by_mnemonic(current_token_str) != nullptr) {
+            auto try_inst = arch->try_inst_by_mnemonic(current_token_str);
+            if (get<1>(try_inst)) {
                 token_type = TokenType::RESERVED;
             }
-            if (get_register_by_name(current_token_str) != nullptr) {
+            auto try_reg = arch->try_register_by_name(current_token_str);
+            if (get<1>(try_reg)) {
                 token_type = TokenType::RESERVED;
             }
 
@@ -194,14 +192,15 @@ int main(int argc, char *argv[]) {
     ifstream ifs(input_file);
     shared_ptr<vector<string>> lines(new vector<string>());
     shared_ptr<string> text(new string());
+    shared_ptr<CpuArch> arch(new CpuArch());
     string line;
     while(getline(ifs, line)) {
         text->append(line + '\n');
     }
     ifs.close();
 
-    auto tokens = tokenize(text);
-    auto code = generate(tokens);
+    auto tokens = tokenize(arch, text);
+    auto code = generate(arch, tokens);
 
     ofstream ofs(output_file, ios::binary);
     ofs.write((char*)&code->at(0), code->size() * 2);
