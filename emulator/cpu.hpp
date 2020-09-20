@@ -1,7 +1,3 @@
-//
-// Created by garicchi on 2020/08/03.
-//
-
 #ifndef EMULATOR_CPU_HPP
 #define EMULATOR_CPU_HPP
 
@@ -20,35 +16,16 @@
 using namespace std;
 
 enum class CpuStatus {
-    FETCH_INST_0,
-    FETCH_INST_1,
-    FETCH_OPERAND_0,
-    FETCH_OPERAND_1,
-    EXEC_INST,
-    WRITE_BACK,
+    FETCH_INST_0,  // 命令フェッチ0
+    FETCH_INST_1,  // 命令フェッチ1
+    FETCH_OPERAND_0,  // オペランドフェッチ0
+    FETCH_OPERAND_1,  // オペランドフェッチ1
+    EXEC_INST,  // 演算実行
+    WRITE_BACK,  // WriteBack (レジスタ、メモリへの下記戻しなど)
 };
 
 class Cpu {
 private:
-    const int PSW_REG_NUMBER = 5;
-    const int SP_REG_NUMBER = 6;
-    const int PC_REG_NUMBER = 7;
-
-    shared_ptr<Program> decode(uint16_t code) {
-        uint16_t mask_opcode = 0b0111100000000000;
-        uint16_t mask_first_operand = 0b0000011100000000;
-        uint16_t mask_second_operand = 0b0000000011111111;
-
-        uint16_t opcode = (code & mask_opcode) >> 11;
-        auto program = make_shared<Program>();
-        program->inst = get_inst_by_opcode(opcode);
-        if (program->inst->operand_type == OperandType::SINGLE_OPERAND || program->inst->operand_type == OperandType::DOUBLE_OPERAND) {
-            program->first_operand = (code & mask_first_operand) >> 8;
-            program->second_operand = code & mask_second_operand;
-        }
-
-        return program;
-    }
 
     void print_info() {
         int index = 0;
@@ -57,11 +34,11 @@ private:
         cout << " " << "CLOCK [" << dec << clock_counter << "]" << endl;
         cout << endl << "-------INSTRUCTION---------" << endl;
         if (current_program != nullptr) {
-            cout << " " << "IR [ " << current_program->inst->mnemonic << " ";
-            if (current_program->inst->operand_type == OperandType::SINGLE_OPERAND ||
-                current_program->inst->operand_type == OperandType::DOUBLE_OPERAND) {
+            cout << " " << "IR [ " << current_program->inst.mnemonic << " ";
+            if (current_program->inst.operand_type == OperandType::SINGLE_OPERAND ||
+                current_program->inst.operand_type == OperandType::DOUBLE_OPERAND) {
                 cout << bitset<3>(current_program->first_operand) << " ";
-                if (current_program->inst->operand_type == OperandType::DOUBLE_OPERAND) {
+                if (current_program->inst.operand_type == OperandType::DOUBLE_OPERAND) {
                     cout << bitset<8>(current_program->second_operand) << " ";
                 }
             }
@@ -79,13 +56,13 @@ private:
         for(uint16_t reg: registers) {
             stringstream hex_str;
             cout << " " <<  "R" << index << " [" << bitset<16>(reg) << "] (0x" << hex << reg << ") ";
-            if (index == PC_REG_NUMBER) {
+            if (index == arch->PC_REG_NUMBER) {
                 cout << " (PC) ";
             }
-            if (index == SP_REG_NUMBER) {
+            if (index == arch->SP_REG_NUMBER) {
                 cout << " (SP) ";
             }
-            if (index == PSW_REG_NUMBER) {
+            if (index == arch->PSW_REG_NUMBER) {
                 cout << "N = "<< psw->get_negative_flag() << " ";
                 cout << "Z = "<< psw->get_zero_flag() << " ";
                 cout << " (PSW) ";
@@ -94,10 +71,10 @@ private:
             index++;
         }
         cout << endl << "----------MEMORY------------" << endl;
-        int min_memory_index = (registers[PC_REG_NUMBER] - 2) >= 0 ? registers[PC_REG_NUMBER] - 2 : 0;
+        int min_memory_index = (registers[arch->PC_REG_NUMBER] - 2) >= 0 ? registers[arch->PC_REG_NUMBER] - 2 : 0;
         for (int i = min_memory_index; i < (min_memory_index + 5); i++) {
             cout << " " << "[0x" << hex << i << "] [" << bitset<16>(memory->memory[i]) << "] ";
-            if (i == registers[PC_REG_NUMBER]) {
+            if (i == registers[arch->PC_REG_NUMBER]) {
                 cout << "(PC)";
             }
             cout << endl;
@@ -112,13 +89,14 @@ public:
     shared_ptr<Alu> alu;
     shared_ptr<Psw> psw;
     shared_ptr<Memory> memory;
+    shared_ptr<CpuArch> arch;
 
     uint16_t mar = 0;
     uint16_t mdr = 0;
 
     map<CpuStatus, string> statuses;
 
-    uint16_t registers[8] = {0};
+    vector<uint16_t> registers;
     uint16_t reg_b = 0;
     uint16_t ir = 0;
 
@@ -132,9 +110,10 @@ public:
     Cpu() {
 
     }
-    Cpu(shared_ptr<Memory> memory) {
+    Cpu(shared_ptr<Memory> memory, shared_ptr<CpuArch> arch) {
         clock_counter = 1;
 
+        // デバッグしやすいように文字列にしておく
         statuses[CpuStatus::FETCH_INST_0] = "FETCH_INST_0";
         statuses[CpuStatus::FETCH_INST_1] = "FETCH_INST_1";
         statuses[CpuStatus::FETCH_OPERAND_0] = "FETCH_OPERAND_0";
@@ -143,15 +122,21 @@ public:
         statuses[CpuStatus::WRITE_BACK] = "WRITE_BACK";
 
         this->memory = memory;
-        this->psw = shared_ptr<Psw>(new Psw(&this->registers[PSW_REG_NUMBER]));
+        this->arch = arch;
+        this->registers = vector<uint16_t>();
+        for (auto r: arch->registers) {
+            this->registers.push_back(0);
+        }
+        this->psw = shared_ptr<Psw>(new Psw(&this->registers[arch->PSW_REG_NUMBER]));
         this->alu = shared_ptr<Alu>(new Alu(this->psw));
     }
 
+    // クロック時の処理
     bool clock() {
         bool is_hlt = false;
         switch (current_status) {
             case CpuStatus::FETCH_INST_0:
-                a_bus = registers[PC_REG_NUMBER];
+                a_bus = registers[arch->PC_REG_NUMBER];
                 alu->mode = AluMode::NOP;
                 s_bus = alu->calc(a_bus, b_bus);
                 current_status = CpuStatus::FETCH_INST_1;
@@ -166,17 +151,17 @@ public:
                 break;
             case CpuStatus::FETCH_OPERAND_0:
                 ir = mdr;
-                current_program = decode(ir);
-                registers[PC_REG_NUMBER] = s_bus;
-                if (current_program->inst->type == InstructionType::MOV
-                    || current_program->inst->type == InstructionType::ADD
-                    || current_program->inst->type == InstructionType::SUB
-                    || current_program->inst->type == InstructionType::AND
-                    || current_program->inst->type == InstructionType::OR
-                    || current_program->inst->type == InstructionType::CMP) {
+                current_program = Program::decode(ir, arch);
+                registers[arch->PC_REG_NUMBER] = s_bus;
+                if (current_program->inst.type == InstructionType::MOV
+                    || current_program->inst.type == InstructionType::ADD
+                    || current_program->inst.type == InstructionType::SUB
+                    || current_program->inst.type == InstructionType::AND
+                    || current_program->inst.type == InstructionType::OR
+                    || current_program->inst.type == InstructionType::CMP) {
                     a_bus = registers[current_program->second_operand >> 5];
                     current_status = CpuStatus::EXEC_INST;
-                } else if (current_program->inst->type == InstructionType::LD || current_program->inst->type == InstructionType::ST) {
+                } else if (current_program->inst.type == InstructionType::LD || current_program->inst.type == InstructionType::ST) {
                     a_bus = current_program->second_operand;
                     current_status = CpuStatus::FETCH_OPERAND_1;
                 } else {
@@ -188,7 +173,7 @@ public:
                 break;
             case CpuStatus::FETCH_OPERAND_1:
                 mar = s_bus;
-                if (current_program->inst->type == InstructionType::LD) {
+                if (current_program->inst.type == InstructionType::LD) {
                     memory->mode = MemoryMode::READ;
                     memory->access(&mar, &mdr);
                 }
@@ -197,7 +182,7 @@ public:
                 current_status = CpuStatus::EXEC_INST;
                 break;
             case CpuStatus::EXEC_INST:
-                switch (current_program->inst->type) {
+                switch (current_program->inst.type) {
                     case InstructionType::HLT:
                         is_hlt = true;
                         break;
@@ -223,12 +208,12 @@ public:
                         break;
                     case InstructionType::JE:
                         a_bus = current_program->second_operand;
-                        current_program->first_operand = PC_REG_NUMBER;
+                        current_program->first_operand = arch->PC_REG_NUMBER;
                         alu->mode = AluMode::NOP;
                         break;
                     case InstructionType::JMP:
                         a_bus = current_program->second_operand;
-                        current_program->first_operand = PC_REG_NUMBER;
+                        current_program->first_operand = arch->PC_REG_NUMBER;
                         alu->mode = AluMode::NOP;
                         break;
                     case InstructionType::LD:
@@ -245,17 +230,17 @@ public:
                 current_status = CpuStatus::WRITE_BACK;
                 break;
             case CpuStatus::WRITE_BACK:
-                if (current_program->inst->type == InstructionType::ST) {
+                if (current_program->inst.type == InstructionType::ST) {
                     mdr = s_bus;
                     memory->mode = MemoryMode::WRITE;
                     memory->access(&mar, &mdr);
-                } else if (current_program->inst->type == InstructionType::LDL || current_program->inst->type == InstructionType::LDH) {
+                } else if (current_program->inst.type == InstructionType::LDL || current_program->inst.type == InstructionType::LDH) {
                     registers[current_program->first_operand] |= s_bus;
-                } else if(current_program->inst->type == InstructionType::JE) {
+                } else if(current_program->inst.type == InstructionType::JE) {
                     if (psw->get_zero_flag()) {
                         registers[current_program->first_operand] = s_bus;
                     }
-                } else if (current_program->inst->type == InstructionType::CMP) {
+                } else if (current_program->inst.type == InstructionType::CMP) {
                     // pass
                 } else {
                     registers[current_program->first_operand] = s_bus;
