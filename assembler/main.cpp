@@ -149,7 +149,7 @@ shared_ptr<vector<Token>> tokenize(shared_ptr<CpuArch> arch, shared_ptr<string> 
             next_char = code_str->at(current_pos + 1);
         }
         // コメント中かどうかを判別
-        if (current_char == '#') {
+        if (current_char == ';') {
             is_among_comment = true;
         }
         if (is_among_comment && current_char == '\n') {
