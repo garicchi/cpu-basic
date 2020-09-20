@@ -195,6 +195,24 @@ public:
                         a_bus = registers[current_program->first_operand];
                         alu->mode = AluMode::ADD;
                         break;
+                    case InstructionType::SUB:
+                        reg_b = s_bus;
+                        b_bus = reg_b;
+                        a_bus = registers[current_program->first_operand];
+                        alu->mode = AluMode::SUB;
+                        break;
+                    case InstructionType::AND:
+                        reg_b = s_bus;
+                        b_bus = reg_b;
+                        a_bus = registers[current_program->first_operand];
+                        alu->mode = AluMode::AND;
+                        break;
+                    case InstructionType::OR:
+                        reg_b = s_bus;
+                        b_bus = reg_b;
+                        a_bus = registers[current_program->first_operand];
+                        alu->mode = AluMode::OR;
+                        break;
                     case InstructionType::SL:
                         alu->mode = AluMode::SHIFT_L;
                         break;

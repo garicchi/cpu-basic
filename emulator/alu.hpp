@@ -43,6 +43,12 @@ public:
             case AluMode::SUB:
                 result = a_bus - b_bus;
                 break;
+            case AluMode::AND:
+                result = a_bus & b_bus;
+                break;
+            case AluMode::OR:
+                result = a_bus | b_bus;
+                break;
             case AluMode::SHIFT_L:
                 result = a_bus << 1;
                 break;
