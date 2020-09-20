@@ -112,14 +112,17 @@ shared_ptr<vector<Program>> parse(shared_ptr<CpuArch> arch, shared_ptr<vector<To
             // 命令の定義からオペランドの数を取得して解析
             if (inst->operand_type == OperandType::SINGLE_OPERAND) {
                 first_operand = resolve_operand(arch, *first_operand_token, label_table);
+                if (first_operand_token->type == TokenType::RESERVED) {
+                    first_operand <<= 8;
+                }
             } else if (inst->operand_type == OperandType::DOUBLE_OPERAND) {
                 first_operand = resolve_operand(arch, *first_operand_token, label_table);
+                second_operand = resolve_operand(arch, *second_operand_token, label_table);
+                // レジスターは3bitなので第2オペランドがレジスターの場合は5bit左シフト
                 if (second_operand_token->type == TokenType::RESERVED) {
-                    // レジスタは3bit幅なので第2オペランドがレジスタの場合は5ビット左に詰める
-                    second_operand = resolve_operand(arch, *second_operand_token, label_table) << 5;
-                } else {
-                    second_operand = resolve_operand(arch, *second_operand_token, label_table);
+                    second_operand <<= 5;
                 }
+
             }
             programs->push_back(Program(inst.value(), first_operand, second_operand));
         } else {
