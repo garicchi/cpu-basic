@@ -14,6 +14,8 @@ enum class AluMode {
     OR,
     XOR,
     NOT,
+    SHIFT_L,
+    SHIFT_R,
     INC,
     DEC,
     NOP
@@ -40,6 +42,12 @@ public:
                 break;
             case AluMode::SUB:
                 result = a_bus - b_bus;
+                break;
+            case AluMode::SHIFT_L:
+                result = a_bus << 1;
+                break;
+            case AluMode::SHIFT_R:
+                result = a_bus >> 1;
                 break;
             case AluMode::CMP:
                 result = a_bus - b_bus;

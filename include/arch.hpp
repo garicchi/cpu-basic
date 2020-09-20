@@ -1,17 +1,24 @@
 #include <memory>
 
-//
-// Created by garicchi on 2020/09/12.
-//
-
 #ifndef CPU_BASIC_ARCH_HPP
 #define CPU_BASIC_ARCH_HPP
 
+// memory layout of instruction
+// instruction using double register
 // 15  14 13 12 11   10 9 8   7 6 5   4 3 2 1 0
-// -   命令           source   dest    ----
+// -   inst           source   dest    ----
 
+// instruction using both register and 8bit data
 // 15  14 13 12 11   10 9 8   7 6 5 4 3 2 1 0
-// -   命令           source   data
+// -   inst          source   data
+
+// instruction using single register
+// 15  14 13 12 11   10 9 8   7 6 5 4 3 2 1 0
+// -   inst           reg     -----
+
+// instruction using single data
+// 15  14 13 12 11   10 9 8 7 6 5 4 3   2 1 0
+// -   inst           data              -----
 
 using namespace std;
 
@@ -23,7 +30,6 @@ enum class InstructionType {
     OR,
     SL,
     SR,
-    SRA,
     LDL,
     LDH,
     CMP,
@@ -78,6 +84,8 @@ public:
     vector<Instruction> instructions = {
             Instruction(InstructionType::MOV, "mov", 0b0000, OperandType::DOUBLE_OPERAND),
             Instruction(InstructionType::ADD, "add", 0b0001, OperandType::DOUBLE_OPERAND),
+            Instruction(InstructionType::SL, "sl", 0b0101, OperandType::SINGLE_OPERAND),
+            Instruction(InstructionType::SR, "sr", 0b0110, OperandType::SINGLE_OPERAND),
             Instruction(InstructionType::LDL, "ldl", 0b1000, OperandType::DOUBLE_OPERAND),
             Instruction(InstructionType::LDH, "ldh", 0b1001, OperandType::DOUBLE_OPERAND),
             Instruction(InstructionType::CMP, "cmp", 0b1010, OperandType::DOUBLE_OPERAND),

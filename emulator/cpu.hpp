@@ -161,9 +161,12 @@ public:
                     || current_program->inst.type == InstructionType::CMP) {
                     a_bus = registers[current_program->second_operand >> 5];
                     current_status = CpuStatus::EXEC_INST;
-                } else if (current_program->inst.type == InstructionType::LD || current_program->inst.type == InstructionType::ST) {
-                    a_bus = current_program->second_operand;
-                    current_status = CpuStatus::FETCH_OPERAND_1;
+                } else if (current_program->inst.type == InstructionType::SL || current_program->inst.type == InstructionType::SR) {
+                    a_bus = registers[current_program->first_operand];
+                    current_status = CpuStatus::EXEC_INST;
+                }else if (current_program->inst.type == InstructionType::LD || current_program->inst.type == InstructionType::ST) {
+                        a_bus = current_program->second_operand;
+                        current_status = CpuStatus::FETCH_OPERAND_1;
                 } else {
                     current_status = CpuStatus::EXEC_INST;
                 }
@@ -191,6 +194,12 @@ public:
                         b_bus = reg_b;
                         a_bus = registers[current_program->first_operand];
                         alu->mode = AluMode::ADD;
+                        break;
+                    case InstructionType::SL:
+                        alu->mode = AluMode::SHIFT_L;
+                        break;
+                    case InstructionType::SR:
+                        alu->mode = AluMode::SHIFT_R;
                         break;
                     case InstructionType::LDL:
                         a_bus = current_program->second_operand;
@@ -235,6 +244,7 @@ public:
                     memory->mode = MemoryMode::WRITE;
                     memory->access(&mar, &mdr);
                 } else if (current_program->inst.type == InstructionType::LDL || current_program->inst.type == InstructionType::LDH) {
+                    // 上位、下位にそれぞれbitを別命令として入れるのでOR
                     registers[current_program->first_operand] |= s_bus;
                 } else if(current_program->inst.type == InstructionType::JE) {
                     if (psw->get_zero_flag()) {
