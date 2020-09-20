@@ -185,9 +185,17 @@ shared_ptr<vector<Token>> tokenize(shared_ptr<CpuArch> arch, shared_ptr<string> 
     return tokens;
 }
 
+void exit_with_help() {
+    cerr << "[USAGE] assembler INPUT_FILE OUTPUT_FILE" << endl;
+    exit(1);
+}
+
 int main(int argc, char *argv[]) {
     char* input_file = argv[1];
     char *output_file = argv[2];
+    if (argc < 3) {
+        exit_with_help();
+    }
     ifstream ifs(input_file);
     shared_ptr<vector<string>> lines(new vector<string>());
     shared_ptr<string> text(new string());
@@ -204,6 +212,8 @@ int main(int argc, char *argv[]) {
     ofstream ofs(output_file, ios::binary);
     ofs.write((char*)&code->at(0), code->size() * 2);
     ofs.close();
+
+    cout << "output binary in " << output_file << endl;
 
     return 0;
 }

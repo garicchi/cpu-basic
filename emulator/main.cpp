@@ -22,8 +22,17 @@ void load_program(shared_ptr<Memory>memory, string file_path) {
     }
 }
 
+void exit_with_help() {
+    cerr << "[USAGE] emulator INPUT_FILE" << endl;
+    exit(1);
+}
+
 int main(int argc, char *argv[]) {
     char *program_file = argv[1];
+
+    if (argc < 2) {
+        exit_with_help();
+    }
 
     shared_ptr<CpuArch> arch(new CpuArch());
     shared_ptr<Memory> memory(new Memory());
