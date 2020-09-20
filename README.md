@@ -1,6 +1,9 @@
 # toy-cpu
 
 A toy cpu for learning basic cpu architecture.
+This repository contains assembler, emulator and sample assembly code.
+
+![run](./img/run.gif)
 
 ## Getting Started
 
@@ -8,8 +11,16 @@ A toy cpu for learning basic cpu architecture.
 cmake .
 make
 
-# assemble test01.s to test01 binary
-./assembler/assembler ./assembler/test/test01.s ./assembler/test/test01
+# assemble sum.s to sum binary
+./assembler/assembler ./sample/sum.s ./sample/sum.bin
 
-# emulate cpu with test01 program
+# emulate cpu with sum program
+./emulator/emulator ./sample/sum.bin
 ```
+
+## Architecture
+
+|||
+|:---:|:---:|
+|CPU bit|16bit|
+|number of Register|8|
