@@ -29,10 +29,10 @@ uint16_t resolve_operand(shared_ptr<CpuArch> arch, Token operand_token, shared_p
     if (label_table->find(operand_token.str) != label_table->end()) {
         return label_table->at(operand_token.str);
     }
-    auto reg = arch->try_register_by_name(operand_token.str);
+    auto reg = arch->get_register_by_name(operand_token.str);
 
-    if (!get<1>(reg)) {
-        return get<0>(reg).code;
+    if (reg) {
+        return reg->code;
     }
     cerr << "invalid operand " << operand_token.str << endl;
     exit(1);
@@ -76,17 +76,16 @@ shared_ptr<vector<uint16_t>> generate(shared_ptr<CpuArch> arch, shared_ptr<vecto
                 second_operand_token = &tokens->at(current_pos++);
             }
 
-            auto try_inst = arch->try_inst_by_mnemonic(first_token->str);
-            if (!get<1>(try_inst)) {
+            auto inst = arch->get_inst_by_mnemonic(first_token->str);
+            if (!inst) {
                 cout << "invalid inst [" << first_token->str << "]" << endl;
             }
             uint16_t first_operand = 0;
             uint16_t second_operand = 0;
 
-            auto inst = get<0>(try_inst);
-            if (inst.operand_type == OperandType::SINGLE_OPERAND) {
+            if (inst->operand_type == OperandType::SINGLE_OPERAND) {
                 first_operand = resolve_operand(arch, *first_operand_token, label_table);
-            } else if (inst.operand_type == OperandType::DOUBLE_OPERAND) {
+            } else if (inst->operand_type == OperandType::DOUBLE_OPERAND) {
                 first_operand = resolve_operand(arch, *first_operand_token, label_table);
                 if (second_operand_token->type == TokenType::RESERVED) {
                     second_operand = resolve_operand(arch, *second_operand_token, label_table) << 5;
@@ -95,7 +94,7 @@ shared_ptr<vector<uint16_t>> generate(shared_ptr<CpuArch> arch, shared_ptr<vecto
                 }
 
             }
-            programs.push_back(Program(inst, first_operand, second_operand));
+            programs.push_back(Program(inst.value(), first_operand, second_operand));
         } else {
             if (first_token->type == TokenType::IDENT) {
                 current_pos++;
@@ -166,12 +165,12 @@ shared_ptr<vector<Token>> tokenize(shared_ptr<CpuArch> arch, shared_ptr<string> 
                 token_type = TokenType::HEX;
             }
 
-            auto try_inst = arch->try_inst_by_mnemonic(current_token_str);
-            if (get<1>(try_inst)) {
+            auto inst = arch->get_inst_by_mnemonic(current_token_str);
+            if (inst) {
                 token_type = TokenType::RESERVED;
             }
-            auto try_reg = arch->try_register_by_name(current_token_str);
-            if (get<1>(try_reg)) {
+            auto reg = arch->get_register_by_name(current_token_str);
+            if (reg) {
                 token_type = TokenType::RESERVED;
             }
 

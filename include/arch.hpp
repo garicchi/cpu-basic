@@ -96,7 +96,7 @@ public:
 
     }
 
-    tuple<Instruction, bool> try_inst_by_mnemonic(string mnemonic) {
+    optional<Instruction> get_inst_by_mnemonic(string mnemonic) {
         int find_index = -1;
         for (int i = 0; i < this->instructions.size(); i++) {
             if (this->instructions[i].mnemonic == mnemonic) {
@@ -105,13 +105,13 @@ public:
             }
         }
         if (find_index >= 0) {
-            return tuple<Instruction, bool>(this->instructions[find_index], true);
+            return this->instructions[find_index];
         } else {
-            return tuple<Instruction, bool>(Instruction(), false);
+            return nullopt;
         }
     }
 
-    tuple<Instruction, bool> try_inst_by_opcode(uint16_t opcode) {
+    optional<Instruction> get_inst_by_opcode(uint16_t opcode) {
         int find_index = -1;
         for (int i = 0; i < this->instructions.size(); i++) {
             if (this->instructions[i].opcode == opcode) {
@@ -120,13 +120,13 @@ public:
             }
         }
         if (find_index >= 0) {
-            return tuple<Instruction, bool>(this->instructions[find_index], true);
+            return this->instructions[find_index];
         } else {
-            return tuple<Instruction, bool>(Instruction(), false);
+            return nullopt;
         }
     }
 
-    tuple<Register, bool> try_register_by_name(string name) {
+    optional<Register> get_register_by_name(string name) {
         int find_index = -1;
         for (int i = 0; i < this->registers.size(); i++) {
             if (this->registers[i].name == name) {
@@ -135,13 +135,11 @@ public:
             }
         }
         if (find_index >= 0) {
-            return tuple<Register, bool>(this->registers[find_index], true);
+            return this->registers[find_index];
         } else {
-            return tuple<Register, bool>(Register(), false);
+            return nullopt;
         }
     }
-
-
 };
 
 
@@ -178,15 +176,15 @@ public:
         uint16_t mask_second_operand = 0b0000000011111111;
 
         uint16_t opcode = (code & mask_opcode) >> 11;
-        auto inst_result = arch->try_inst_by_opcode(opcode);
+        auto inst = arch->get_inst_by_opcode(opcode);
 
-        if (!get<1>(inst_result)) {
+        if (!inst) {
             cerr << "invalid opcode " << opcode << endl;
             exit(1);
         }
         uint16_t first_operand = (code & mask_first_operand) >> 8;
         uint16_t second_operand = (code & mask_second_operand);
-        return Program(get<0>(inst_result), first_operand, second_operand);
+        return Program(inst.value(), first_operand, second_operand);
     }
 
 };

@@ -25,8 +25,9 @@ void load_program(shared_ptr<Memory>memory, string file_path) {
 int main(int argc, char *argv[]) {
     char *program_file = argv[1];
 
+    shared_ptr<CpuArch> arch(new CpuArch());
     shared_ptr<Memory> memory(new Memory());
-    shared_ptr<Cpu> cpu(new Cpu(memory));
+    shared_ptr<Cpu> cpu(new Cpu(memory, arch));
     load_program(memory, string(program_file));
 
     while(true) {

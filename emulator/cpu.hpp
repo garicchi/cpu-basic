@@ -41,8 +41,13 @@ private:
 
         uint16_t opcode = (code & mask_opcode) >> 11;
         auto program = make_shared<Program>();
-        program->inst = get_inst_by_opcode(opcode);
-        if (program->inst->operand_type == OperandType::SINGLE_OPERAND || program->inst->operand_type == OperandType::DOUBLE_OPERAND) {
+        auto inst = arch->get_inst_by_opcode(opcode);
+        if(!inst) {
+            cerr << "invalid opcode " << opcode << endl;
+            exit(1);
+        }
+        program->inst = inst.value();
+        if (program->inst.operand_type == OperandType::SINGLE_OPERAND || program->inst.operand_type == OperandType::DOUBLE_OPERAND) {
             program->first_operand = (code & mask_first_operand) >> 8;
             program->second_operand = code & mask_second_operand;
         }
@@ -57,11 +62,11 @@ private:
         cout << " " << "CLOCK [" << dec << clock_counter << "]" << endl;
         cout << endl << "-------INSTRUCTION---------" << endl;
         if (current_program != nullptr) {
-            cout << " " << "IR [ " << current_program->inst->mnemonic << " ";
-            if (current_program->inst->operand_type == OperandType::SINGLE_OPERAND ||
-                current_program->inst->operand_type == OperandType::DOUBLE_OPERAND) {
+            cout << " " << "IR [ " << current_program->inst.mnemonic << " ";
+            if (current_program->inst.operand_type == OperandType::SINGLE_OPERAND ||
+                current_program->inst.operand_type == OperandType::DOUBLE_OPERAND) {
                 cout << bitset<3>(current_program->first_operand) << " ";
-                if (current_program->inst->operand_type == OperandType::DOUBLE_OPERAND) {
+                if (current_program->inst.operand_type == OperandType::DOUBLE_OPERAND) {
                     cout << bitset<8>(current_program->second_operand) << " ";
                 }
             }
@@ -112,6 +117,7 @@ public:
     shared_ptr<Alu> alu;
     shared_ptr<Psw> psw;
     shared_ptr<Memory> memory;
+    shared_ptr<CpuArch> arch;
 
     uint16_t mar = 0;
     uint16_t mdr = 0;
@@ -132,7 +138,7 @@ public:
     Cpu() {
 
     }
-    Cpu(shared_ptr<Memory> memory) {
+    Cpu(shared_ptr<Memory> memory, shared_ptr<CpuArch> arch) {
         clock_counter = 1;
 
         statuses[CpuStatus::FETCH_INST_0] = "FETCH_INST_0";
@@ -143,6 +149,7 @@ public:
         statuses[CpuStatus::WRITE_BACK] = "WRITE_BACK";
 
         this->memory = memory;
+        this->arch = arch;
         this->psw = shared_ptr<Psw>(new Psw(&this->registers[PSW_REG_NUMBER]));
         this->alu = shared_ptr<Alu>(new Alu(this->psw));
     }
@@ -168,15 +175,15 @@ public:
                 ir = mdr;
                 current_program = decode(ir);
                 registers[PC_REG_NUMBER] = s_bus;
-                if (current_program->inst->type == InstructionType::MOV
-                    || current_program->inst->type == InstructionType::ADD
-                    || current_program->inst->type == InstructionType::SUB
-                    || current_program->inst->type == InstructionType::AND
-                    || current_program->inst->type == InstructionType::OR
-                    || current_program->inst->type == InstructionType::CMP) {
+                if (current_program->inst.type == InstructionType::MOV
+                    || current_program->inst.type == InstructionType::ADD
+                    || current_program->inst.type == InstructionType::SUB
+                    || current_program->inst.type == InstructionType::AND
+                    || current_program->inst.type == InstructionType::OR
+                    || current_program->inst.type == InstructionType::CMP) {
                     a_bus = registers[current_program->second_operand >> 5];
                     current_status = CpuStatus::EXEC_INST;
-                } else if (current_program->inst->type == InstructionType::LD || current_program->inst->type == InstructionType::ST) {
+                } else if (current_program->inst.type == InstructionType::LD || current_program->inst.type == InstructionType::ST) {
                     a_bus = current_program->second_operand;
                     current_status = CpuStatus::FETCH_OPERAND_1;
                 } else {
@@ -188,7 +195,7 @@ public:
                 break;
             case CpuStatus::FETCH_OPERAND_1:
                 mar = s_bus;
-                if (current_program->inst->type == InstructionType::LD) {
+                if (current_program->inst.type == InstructionType::LD) {
                     memory->mode = MemoryMode::READ;
                     memory->access(&mar, &mdr);
                 }
@@ -197,7 +204,7 @@ public:
                 current_status = CpuStatus::EXEC_INST;
                 break;
             case CpuStatus::EXEC_INST:
-                switch (current_program->inst->type) {
+                switch (current_program->inst.type) {
                     case InstructionType::HLT:
                         is_hlt = true;
                         break;
@@ -245,17 +252,17 @@ public:
                 current_status = CpuStatus::WRITE_BACK;
                 break;
             case CpuStatus::WRITE_BACK:
-                if (current_program->inst->type == InstructionType::ST) {
+                if (current_program->inst.type == InstructionType::ST) {
                     mdr = s_bus;
                     memory->mode = MemoryMode::WRITE;
                     memory->access(&mar, &mdr);
-                } else if (current_program->inst->type == InstructionType::LDL || current_program->inst->type == InstructionType::LDH) {
+                } else if (current_program->inst.type == InstructionType::LDL || current_program->inst.type == InstructionType::LDH) {
                     registers[current_program->first_operand] |= s_bus;
-                } else if(current_program->inst->type == InstructionType::JE) {
+                } else if(current_program->inst.type == InstructionType::JE) {
                     if (psw->get_zero_flag()) {
                         registers[current_program->first_operand] = s_bus;
                     }
-                } else if (current_program->inst->type == InstructionType::CMP) {
+                } else if (current_program->inst.type == InstructionType::CMP) {
                     // pass
                 } else {
                     registers[current_program->first_operand] = s_bus;
