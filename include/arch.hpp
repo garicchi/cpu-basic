@@ -84,6 +84,9 @@ public:
     vector<Instruction> instructions = {
             Instruction(InstructionType::MOV, "mov", 0b0000, OperandType::DOUBLE_OPERAND),
             Instruction(InstructionType::ADD, "add", 0b0001, OperandType::DOUBLE_OPERAND),
+            Instruction(InstructionType::SUB, "sub", 0b0010, OperandType::DOUBLE_OPERAND),
+            Instruction(InstructionType::AND, "and", 0b0011, OperandType::DOUBLE_OPERAND),
+            Instruction(InstructionType::OR, "or", 0b0100, OperandType::DOUBLE_OPERAND),
             Instruction(InstructionType::SL, "sl", 0b0101, OperandType::SINGLE_OPERAND),
             Instruction(InstructionType::SR, "sr", 0b0110, OperandType::SINGLE_OPERAND),
             Instruction(InstructionType::LDL, "ldl", 0b1000, OperandType::DOUBLE_OPERAND),
