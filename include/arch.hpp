@@ -40,6 +40,7 @@ enum class OperandType {
     NO_OPERAND
 };
 
+// 命令の定義
 class Instruction {
 public:
     InstructionType type;
@@ -57,10 +58,11 @@ public:
     }
 };
 
+// レジスタの定義
 class Register {
 public:
     string name;
-    uint16_t code;
+    uint16_t code;  // 3bitしかつかわないけど
     Register() {
 
     }
@@ -70,6 +72,7 @@ public:
     }
 };
 
+// CPUのアーキテクチャの構造
 class CpuArch {
 public:
     vector<Instruction> instructions = {
@@ -89,8 +92,16 @@ public:
             Register("r0", 0b000),
             Register("r1", 0b001),
             Register("r2", 0b010),
-            Register("r3", 0b011)
+            Register("r3", 0b011),
+            Register("r4", 0b100),
+            Register("r5", 0b101), // PSW
+            Register("r6", 0b110), // Stack Pointer
+            Register("r7", 0b111), // Program Counter
     };
+
+    const int PSW_REG_NUMBER = 5;
+    const int SP_REG_NUMBER = 6;
+    const int PC_REG_NUMBER = 7;
 
     CpuArch() {
 
@@ -142,7 +153,7 @@ public:
     }
 };
 
-
+// 命令とオペランドの構造
 class Program {
 public:
     Instruction inst;

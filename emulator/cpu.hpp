@@ -20,19 +20,16 @@
 using namespace std;
 
 enum class CpuStatus {
-    FETCH_INST_0,
-    FETCH_INST_1,
-    FETCH_OPERAND_0,
-    FETCH_OPERAND_1,
-    EXEC_INST,
-    WRITE_BACK,
+    FETCH_INST_0,  // 命令フェッチ0
+    FETCH_INST_1,  // 命令フェッチ1
+    FETCH_OPERAND_0,  // オペランドフェッチ0
+    FETCH_OPERAND_1,  // オペランドフェッチ1
+    EXEC_INST,  // 演算実行
+    WRITE_BACK,  // WriteBack (レジスタ、メモリへの下記戻しなど)
 };
 
 class Cpu {
 private:
-    const int PSW_REG_NUMBER = 5;
-    const int SP_REG_NUMBER = 6;
-    const int PC_REG_NUMBER = 7;
 
     shared_ptr<Program> decode(uint16_t code) {
         uint16_t mask_opcode = 0b0111100000000000;
@@ -84,13 +81,13 @@ private:
         for(uint16_t reg: registers) {
             stringstream hex_str;
             cout << " " <<  "R" << index << " [" << bitset<16>(reg) << "] (0x" << hex << reg << ") ";
-            if (index == PC_REG_NUMBER) {
+            if (index == arch->PC_REG_NUMBER) {
                 cout << " (PC) ";
             }
-            if (index == SP_REG_NUMBER) {
+            if (index == arch->SP_REG_NUMBER) {
                 cout << " (SP) ";
             }
-            if (index == PSW_REG_NUMBER) {
+            if (index == arch->PSW_REG_NUMBER) {
                 cout << "N = "<< psw->get_negative_flag() << " ";
                 cout << "Z = "<< psw->get_zero_flag() << " ";
                 cout << " (PSW) ";
@@ -99,10 +96,10 @@ private:
             index++;
         }
         cout << endl << "----------MEMORY------------" << endl;
-        int min_memory_index = (registers[PC_REG_NUMBER] - 2) >= 0 ? registers[PC_REG_NUMBER] - 2 : 0;
+        int min_memory_index = (registers[arch->PC_REG_NUMBER] - 2) >= 0 ? registers[arch->PC_REG_NUMBER] - 2 : 0;
         for (int i = min_memory_index; i < (min_memory_index + 5); i++) {
             cout << " " << "[0x" << hex << i << "] [" << bitset<16>(memory->memory[i]) << "] ";
-            if (i == registers[PC_REG_NUMBER]) {
+            if (i == registers[arch->PC_REG_NUMBER]) {
                 cout << "(PC)";
             }
             cout << endl;
@@ -124,7 +121,7 @@ public:
 
     map<CpuStatus, string> statuses;
 
-    uint16_t registers[8] = {0};
+    vector<uint16_t> registers;
     uint16_t reg_b = 0;
     uint16_t ir = 0;
 
@@ -150,7 +147,11 @@ public:
 
         this->memory = memory;
         this->arch = arch;
-        this->psw = shared_ptr<Psw>(new Psw(&this->registers[PSW_REG_NUMBER]));
+        this->registers = vector<uint16_t>();
+        for (auto r: arch->registers) {
+            this->registers.push_back(0);
+        }
+        this->psw = shared_ptr<Psw>(new Psw(&this->registers[arch->PSW_REG_NUMBER]));
         this->alu = shared_ptr<Alu>(new Alu(this->psw));
     }
 
@@ -158,7 +159,7 @@ public:
         bool is_hlt = false;
         switch (current_status) {
             case CpuStatus::FETCH_INST_0:
-                a_bus = registers[PC_REG_NUMBER];
+                a_bus = registers[arch->PC_REG_NUMBER];
                 alu->mode = AluMode::NOP;
                 s_bus = alu->calc(a_bus, b_bus);
                 current_status = CpuStatus::FETCH_INST_1;
@@ -174,7 +175,7 @@ public:
             case CpuStatus::FETCH_OPERAND_0:
                 ir = mdr;
                 current_program = decode(ir);
-                registers[PC_REG_NUMBER] = s_bus;
+                registers[arch->PC_REG_NUMBER] = s_bus;
                 if (current_program->inst.type == InstructionType::MOV
                     || current_program->inst.type == InstructionType::ADD
                     || current_program->inst.type == InstructionType::SUB
@@ -230,12 +231,12 @@ public:
                         break;
                     case InstructionType::JE:
                         a_bus = current_program->second_operand;
-                        current_program->first_operand = PC_REG_NUMBER;
+                        current_program->first_operand = arch->PC_REG_NUMBER;
                         alu->mode = AluMode::NOP;
                         break;
                     case InstructionType::JMP:
                         a_bus = current_program->second_operand;
-                        current_program->first_operand = PC_REG_NUMBER;
+                        current_program->first_operand = arch->PC_REG_NUMBER;
                         alu->mode = AluMode::NOP;
                         break;
                     case InstructionType::LD:

@@ -37,15 +37,19 @@ int main(int argc, char *argv[]) {
     shared_ptr<CpuArch> arch(new CpuArch());
     shared_ptr<Memory> memory(new Memory());
     shared_ptr<Cpu> cpu(new Cpu(memory, arch));
+    // プログラムをメモリに読み込む
     load_program(memory, string(program_file));
 
+    // クロックを回す
     while(true) {
         if (cpu->clock()) {
             break;
         }
+        // 人間にわかりやすいようにクロックは0.1秒sleepする
         usleep(100000);
     }
 
+    // 0x64のアドレスは結果表示用とする
     cout << "RESULT is [" << memory->memory[0x64] << "]" << endl;
 
     return 0;
