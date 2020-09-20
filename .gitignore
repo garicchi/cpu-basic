@@ -37,3 +37,4 @@ CMakeCache.txt
 peda-session-*
 cmake_install.cmake
 *.cbp
+Makefile
