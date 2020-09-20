@@ -31,27 +31,6 @@ enum class CpuStatus {
 class Cpu {
 private:
 
-    shared_ptr<Program> decode(uint16_t code) {
-        uint16_t mask_opcode = 0b0111100000000000;
-        uint16_t mask_first_operand = 0b0000011100000000;
-        uint16_t mask_second_operand = 0b0000000011111111;
-
-        uint16_t opcode = (code & mask_opcode) >> 11;
-        auto program = make_shared<Program>();
-        auto inst = arch->get_inst_by_opcode(opcode);
-        if(!inst) {
-            cerr << "invalid opcode " << opcode << endl;
-            exit(1);
-        }
-        program->inst = inst.value();
-        if (program->inst.operand_type == OperandType::SINGLE_OPERAND || program->inst.operand_type == OperandType::DOUBLE_OPERAND) {
-            program->first_operand = (code & mask_first_operand) >> 8;
-            program->second_operand = code & mask_second_operand;
-        }
-
-        return program;
-    }
-
     void print_info() {
         int index = 0;
         cout << "\033[2J" <<"\033[0;0H";  // clear screen
@@ -174,7 +153,7 @@ public:
                 break;
             case CpuStatus::FETCH_OPERAND_0:
                 ir = mdr;
-                current_program = decode(ir);
+                current_program = Program::decode(ir, arch);
                 registers[arch->PC_REG_NUMBER] = s_bus;
                 if (current_program->inst.type == InstructionType::MOV
                     || current_program->inst.type == InstructionType::ADD

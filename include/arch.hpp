@@ -181,7 +181,7 @@ public:
         return code;
     }
 
-    static Program deassemble(uint16_t code, shared_ptr<CpuArch> arch) {
+    static shared_ptr<Program> decode(uint16_t code, shared_ptr<CpuArch> arch) {
         uint16_t mask_opcode = 0b0111100000000000;
         uint16_t mask_first_operand = 0b0000011100000000;
         uint16_t mask_second_operand = 0b0000000011111111;
@@ -193,9 +193,11 @@ public:
             cerr << "invalid opcode " << opcode << endl;
             exit(1);
         }
+
         uint16_t first_operand = (code & mask_first_operand) >> 8;
         uint16_t second_operand = (code & mask_second_operand);
-        return Program(inst.value(), first_operand, second_operand);
+
+        return shared_ptr<Program>(new Program(inst.value(), first_operand, second_operand));
     }
 
 };
