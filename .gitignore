@@ -40,3 +40,4 @@ cmake_install.cmake
 Makefile
 assembler/assembler
 emulator/emulator
+*.bin
